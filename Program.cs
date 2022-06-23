@@ -24,8 +24,8 @@ var pipExecutable = Path.Combine(destinationDirectory, "Scripts", "pip.exe");
 var distributionFilename = $"{destinationDirectoryName}.zip";
 
 // Download everything that we need
-HelperMethods.DownloadFile(portableUrl, portableZip);
-HelperMethods.DownloadFile(pipScriptUrl, pipScript);
+await HelperMethods.DownloadFile(portableUrl, portableZip);
+await HelperMethods.DownloadFile(pipScriptUrl, pipScript);
 
 // Extract the portable distribution
 if (Directory.Exists(destinationDirectory)) Directory.Delete(destinationDirectory, true);
@@ -77,13 +77,15 @@ internal static class HelperMethods
         return tempDirectory;
     }
 
-    internal static void DownloadFile(string url, string path)
+    internal static async Task DownloadFile(string url, string path)
     {
-        var client = new WebClient();
-        client.Headers.Add("User-Agent", "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.2; .NET CLR 1.0.3705;)");
-        
         Console.WriteLine($"Downloading {url}");
-        client.DownloadFile(new Uri(url), path);
+
+        var client = new HttpClient();
+        var response = await client.GetAsync(new Uri(url));
+
+        using var fs = new FileStream(path, FileMode.Create);
+        await response.Content.CopyToAsync(fs);
     }
 
     internal static void RunPython(string pythonDirectory, IEnumerable<string> arguments)
