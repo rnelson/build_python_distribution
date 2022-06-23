@@ -31,6 +31,8 @@ await HelperMethods.DownloadFile(pipScriptUrl, pipScript);
 if (Directory.Exists(destinationDirectory)) Directory.Delete(destinationDirectory, true);
 Console.WriteLine($"Extracting Python {VERSION} to {destinationDirectoryName}");
 ZipFile.ExtractToDirectory(portableZip, destinationDirectory);
+ZipFile.ExtractToDirectory(Path.Combine(destinationDirectory, $"python{squishyVersion}.zip"), Path.Combine(destinationDirectory, "Lib"));
+Directory.CreateDirectory(Path.Combine(destinationDirectory, "DLLs"));
 
 // Replace the contents of the _pth file
 Console.WriteLine($"Creating a backup of {pthFile}");
