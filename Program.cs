@@ -1,11 +1,12 @@
-﻿using System.Net;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.IO.Compression;
 
 const string PLATFORM = "amd64";
 const string VERSION = "3.10.5";
 
-Console.WriteLine($"Creating a Python {VERSION} ({PLATFORM}) distribution.");
+var header = $"Python {VERSION} ({PLATFORM})";
+Console.WriteLine(header);
+Console.WriteLine(new string('=', header.Length));
 
 // Create a temporary directory to work out of
 var workdir = HelperMethods.GetTemporaryDirectory();
@@ -22,21 +23,7 @@ var portableZip = Path.Combine(workdir, $"python-{VERSION}-embed-{PLATFORM}.zip"
 var pipScript = Path.Combine(workdir, "get-pip.py");
 var pipExecutable = Path.Combine(destinationDirectory, "Scripts", "pip.exe");
 var distributionFilename = $"{destinationDirectoryName}.zip";
-
-// Download everything that we need
-await HelperMethods.DownloadFile(portableUrl, portableZip);
-await HelperMethods.DownloadFile(pipScriptUrl, pipScript);
-
-// Extract the portable distribution
-if (Directory.Exists(destinationDirectory)) Directory.Delete(destinationDirectory, true);
-Console.WriteLine($"Extracting Python {VERSION} to {destinationDirectoryName}");
-ZipFile.ExtractToDirectory(portableZip, destinationDirectory);
-ZipFile.ExtractToDirectory(Path.Combine(destinationDirectory, $"python{squishyVersion}.zip"), Path.Combine(destinationDirectory, "Lib"));
-Directory.CreateDirectory(Path.Combine(destinationDirectory, "DLLs"));
-
-// Replace the contents of the _pth file
-Console.WriteLine($"Creating a backup of {pthFile}");
-File.Move(pthFile, $"{pthFile}.bak");
+var tempDistributionZipPath = Path.Combine(@"C:\temp\", distributionFilename);
 var pth = new List<string>
 {
     "Lib/site-packages",
@@ -46,6 +33,27 @@ var pth = new List<string>
     "# Uncomment to run site.main() automatically",
     "#import site"
 };
+
+// Download everything that we need
+await HelperMethods.DownloadFile(portableUrl, portableZip);
+await HelperMethods.DownloadFile(pipScriptUrl, pipScript);
+
+// Remove the destination directory if it happens to exist; this should never happen
+// during normal use, but if you set `workdir` to a manual path that exists, it may
+if (Directory.Exists(destinationDirectory))
+    Directory.Delete(destinationDirectory, true);
+
+// Extract the portable distribution
+Console.WriteLine($"Extracting Python {VERSION} to {destinationDirectoryName}");
+ZipFile.ExtractToDirectory(portableZip, destinationDirectory);
+ZipFile.ExtractToDirectory(Path.Combine(destinationDirectory, $"python{squishyVersion}.zip"), Path.Combine(destinationDirectory, "Lib"));
+Directory.CreateDirectory(Path.Combine(destinationDirectory, "DLLs"));
+
+// Create a backup of the _pth file
+Console.WriteLine($"Creating a backup of {pthFile}");
+File.Move(pthFile, $"{pthFile}.bak");
+
+// Replace the contents of the _pth file
 Console.WriteLine($"Replacing {pthFile}");
 File.Delete(pthFile);
 File.WriteAllLines(pthFile, pth);
@@ -58,17 +66,22 @@ HelperMethods.Run(destinationDirectory, pipExecutable, new List<string> { "insta
 // Create the distribution zip and clean up files
 Console.WriteLine($"Creating {distributionFilename}");
 ZipFile.CreateFromDirectory(destinationDirectory, Path.Combine(workdir, distributionFilename));
-if (File.Exists(Path.Combine(@"C:\temp\", distributionFilename))) File.Delete(Path.Combine(@"C:\temp\", distributionFilename));
-File.Copy(Path.Combine(workdir, distributionFilename), Path.Combine(@"C:\temp\", distributionFilename));
-Console.WriteLine("Cleaning up.");
+
+// Copy the zip to C:\temp
+if (File.Exists(tempDistributionZipPath))
+    File.Delete(tempDistributionZipPath);
+File.Copy(Path.Combine(workdir, distributionFilename), tempDistributionZipPath);
+
+// Delete all the random stuff we created
+Console.WriteLine("Cleaning up");
 Directory.Delete(destinationDirectory, true);
 File.Delete(pipScript);
 File.Delete(portableZip);
 Directory.Delete(workdir, true);
 
+// el fin.
 Console.WriteLine();
-Console.WriteLine();
-Console.WriteLine($"Done. Your Python {VERSION} ({PLATFORM}) distribution is available at {Path.Combine(@"C:\temp\", distributionFilename)}");
+Console.WriteLine($"Done! Your {header} distribution is available at {tempDistributionZipPath}");
 
 internal static class HelperMethods
 {
@@ -98,7 +111,7 @@ internal static class HelperMethods
 
     internal static void Run(string workingDirectory, string command, IEnumerable<string> arguments, bool setPythonPath = true)
     {
-        var argv = arguments.Aggregate(string.Empty, (c, n) => $"{c} {n}");
+        var argv = arguments.Aggregate(string.Empty, (c, n) => $"{c} {n}").Trim();
         Console.WriteLine($"Executing: {command} {argv}");
 
         var psi = new ProcessStartInfo(command);
